@@ -1,0 +1,63 @@
+name: PHP CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up PHP
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2' # Adjust as needed
+          extensions: mbstring, intl, pdo, pdo_mysql
+          ini-values: post_max_size=256M, upload_max_filesize=256M
+          coverage: none
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: composer install --no-progress --no-suggest --prefer-dist
+
+      # Step 4: Run PHP lint
+      - name: PHP lint
+        run: php -l index.php
+
+      # Step 5: Run PHPUnit (if applicable)
+      - name: Run PHPUnit
+        run: |
+          if [ -f vendor/bin/phpunit ]; then
+            vendor/bin/phpunit --coverage-text
+          else
+            echo "PHPUnit not configured, skipping tests."
+          fi
+
+  deploy:
+    name: Deploy to Azure App Service
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Deploy to Azure
+      - name: Azure Web App Deploy
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: your-app-service-name # Replace with your Azure App Service name
+          slot-name: production
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
