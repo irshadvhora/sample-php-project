@@ -1,21 +1,56 @@
-name: PHP Composer
+name: Build and Deploy PHP Project
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-permissions:
-  contents: read
+    branches:
+      - main  # Adjust this to your deployment branch
 
 jobs:
-  build:
-
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      # Step 1: Checkout Code
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Install dependencies
-      run: composer install --prefer-dist --no-progress
+      # Step 2: Set up PHP
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2' # Adjust PHP version if needed
+          tools: composer
+
+      # Step 3: Install Dependencies
+      - name: Install PHP dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      # Step 4: Set up SSH Agent
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
+
+      # Step 5: Deploy Files to Droplet
+      - name: Deploy to DigitalOcean
+        run: |
+          # Variables
+          USER=${{ secrets.DROPLET_USER }}
+          HOST=${{ secrets.DROPLET_IP }}
+          PATH=${{ secrets.DEPLOY_PATH }}
+
+          # Upload files to the droplet
+          scp -r . $USER@$HOST:$PATH
+
+          # Run post-deploy commands on the droplet
+          ssh $USER@$HOST << EOF
+            # Navigate to deployment path
+            cd $PATH
+
+            # Set permissions
+            chmod -R 755 $PATH
+
+            # Restart Apache (adjust for your web server)
+            sudo systemctl restart apache2
+          EOF
+ 
